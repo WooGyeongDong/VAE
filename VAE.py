@@ -11,6 +11,15 @@ import numpy as np
 from tqdm import tqdm
 import copy
 #%%
+config = {'input_dim' : 28*28,
+          'hidden_dim' : 500,
+          'latent_dim' : 2,
+          'batch_size' : 100,
+          'epochs' : 30,
+          'lr' : 0.01,
+          'best_loss' : 10**9,
+          'patience_limit' : 3}
+#%%
 is_cuda = torch.cuda.is_available()
 device = torch.device('cuda' if is_cuda else 'cpu')
 print('Current cuda device is', device)
@@ -28,11 +37,6 @@ print('number of training data : ', len(train_data))
 print('number of test data : ', len(test_data))
 
 # %%
-
-image, label = train_data[0]
-plt.imshow(image.squeeze().numpy(), cmap='gray')
-plt.title('label : %s' % label)
-plt.show()
 
 train_dataloader = DataLoader(train_data, batch_size = 100, shuffle=True )
 test_dataloader = DataLoader(test_data, batch_size = 100)
@@ -103,28 +107,24 @@ class VAE(nn.Module):
         return x_reconst, mu, logvar 
 
 #%%
-img_size = 28**2
-hidden_dim = 500
-latent_dim = 2
-
-model = VAE(img_size, hidden_dim, latent_dim).to(device)
-optimizer = torch.optim.Adagrad(model.parameters(), lr = 0.01)
+model = VAE(x_dim=config['input_dim'], h_dim = config['hidden_dim'], z_dim = config['latent_dim']).to(device)
+optimizer = torch.optim.Adagrad(model.parameters(), lr = config['lr'])
 
 #%%
 def loss_func(x, x_reconst, mu, logvar):
-    kl_div = 0.5 * torch.sum(mu.pow(2) + logvar.exp() - logvar - 1)
+    kl_div = 0.5 * torch.sum(mu**2 + logvar.exp() - logvar - 1)
     reconst_loss = F.binary_cross_entropy(x_reconst, x, reduction='sum')
     loss = kl_div + reconst_loss
     
     return loss
 
-#%%   
-n_epochs = 50
-best_loss = 10 ** 9 # 매우 큰 값으로 초기값 가정
-patience_limit = 3 # 몇 번의 epoch까지 지켜볼지를 결정
+#%% 
+img_size = config['input_dim']  
+best_loss = config['best_loss']
+patience_limit = config['patience_limit']
 patience_check = 0 # 현재 몇 epoch 연속으로 loss 개선이 안되는지를 기록
 val = []
-for epoch in tqdm(range(n_epochs)):
+for epoch in tqdm(range(config['epochs'])):
     model.train()
     train_loss = 0
     for x, _ in train_dataloader:
