@@ -56,13 +56,21 @@ $\widetilde{\mathcal{L}}(\theta, \phi ; x^{(i)}) = -D_{KL}(q_{\phi}(z|x^{(i)})||
 ![media_images_original_601_3b777ad78d25eca75335](https://github.com/WooGyeongDong/VAE/assets/143774643/ce76e235-ebbb-49cf-bbc9-d99b6fd6d8f3)
 
 - 하이퍼파라미터는 논문을 참고하여 결정하였다.
+  
 'input_dim' : 28*28,
+
 'hidden_dim' : 500,
+
 'latent_dim' : 2,
+
 'batch_size' : 100,
+
 'epochs' : 100,
+
 'lr' : 0.01,
+
 'best_loss' : 10**9,
+
 'patience_limit' : 3
 
 ### 결과
@@ -72,11 +80,11 @@ $\widetilde{\mathcal{L}}(\theta, \phi ; x^{(i)}) = -D_{KL}(q_{\phi}(z|x^{(i)})||
 ![W B Chart 2023  10  18  오후 7_15_12](https://github.com/WooGyeongDong/VAE/assets/143774643/e325db02-61e9-4e62-8d3b-fc132190250e)
 
 - 위의 MNIST예시를 Input으로 생성한 결과
-- 
+  
 ![media_images_generate_100_db4ff0c9293a7e0799dd](https://github.com/WooGyeongDong/VAE/assets/143774643/3c5c2831-15a8-437c-8f0f-7d4f3208cbf6)
 
 - Latent variable(z)에 따른 생성 결과
-- 
+  
 ![media_images_latent generate_100_3f3199a1788b5b61e25a](https://github.com/WooGyeongDong/VAE/assets/143774643/3a79a827-9b33-45d6-9b13-046a8f58bcc9)
 
 
