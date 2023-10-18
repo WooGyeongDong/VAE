@@ -141,7 +141,7 @@ for epoch in tqdm(range(config['epochs'])):
             x_val = x_val.to(device)
             x_val_reconst, mu_de, logvar_de, mu, logvar = model_n(x_val)
 
-            loss = mod.loss_norm(x, mu_de, logvar_de, mu, logvar).item()
+            loss = mod.loss_norm(x_val, mu_de, logvar_de, mu, logvar).item()
             val_loss += loss/len(test_dataloader.dataset)
         val.append(val_loss)
         wandb.log({'train_loss':train_loss/len(train_dataloader.dataset), 'valid_loss': val_loss})
@@ -160,7 +160,7 @@ for epoch in tqdm(range(config['epochs'])):
 
 #%%
 
-image = [test_data[i][0] for i in range(9)]
+image[0].shape = [test_data[i][0] for i in range(9)]
 grid_img = torchvision.utils.make_grid(image, nrow=3)
 
 generate_image = [model_n(image[i].view(-1, img_size).to(device))[0].reshape(-1,28,28) for i in range(9)]
@@ -178,4 +178,3 @@ wandb.log({"original": wandb.Image(grid_img),
            "latent generate": wandb.Image(latent_grid_img)})
 
 #%%
-

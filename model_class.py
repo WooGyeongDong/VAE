@@ -52,7 +52,7 @@ class Decoder(nn.Module):
 
     def forward(self, z):
         z = self.fc1(z)
-        x_reconst = F.sigmoid(self.fc2(z))
+        x_reconst = torch.sigmoid(self.fc2(z))
         return x_reconst
 
 #%%
