@@ -67,6 +67,13 @@ class VAE(nn.Module):
         x_reconst = self.decoder(z)
         return x_reconst, mu, logvar 
     
+def loss_func(x, x_reconst, mu, logvar):
+    kl_div = 0.5 * torch.sum(mu**2 + logvar.exp() - logvar - 1)
+    reconst_loss = F.binary_cross_entropy(x_reconst, x, reduction='sum')
+    loss = kl_div + reconst_loss
+    
+    return loss
+    
 class Decoder_norm(nn.Module):
     def __init__(self, x_dim, h_dim, z_dim):
         super().__init__()
@@ -76,17 +83,19 @@ class Decoder_norm(nn.Module):
             nn.Linear(z_dim, h_dim),
             nn.Tanh(),
         )
+        nn.init.normal_(self.fc1[0].weight, mean=0, std= 0.1)
 
         # output layer
         self.mu = nn.Linear(h_dim, x_dim)
         self.logvar = nn.Linear(h_dim, x_dim)
-
+        nn.init.normal_(self.mu.weight, mean=0, std= 0.1)
+        nn.init.normal_(self.logvar.weight, mean=0, std= 0.1)
 
     def forward(self, z):
         z = self.fc1(z)
         
-        mu_de = F.relu(self.mu(z))
-        logvar_de = F.relu(self.logvar(z))
+        mu_de = self.mu(z)
+        logvar_de = self.logvar(z)
         
         x_reconst = reparameterization(mu_de, logvar_de)
         return x_reconst, mu_de, logvar_de
@@ -104,7 +113,7 @@ class VAE_norm(nn.Module):
     
 def loss_norm(x, mu_de, logvar_de , mu, logvar):
     kl_div = 0.5 * torch.sum(mu**2 + logvar.exp() - logvar - 1)
-    reconst_loss = torch.sum(torch.log(1/(((2*torch.pi)**(1/2))*torch.exp(logvar_de/2))*torch.exp(((x-mu_de)**2)/(2*torch.exp(logvar_de)))))
-    loss = kl_div - reconst_loss
+    reconst_loss = 0.5*torch.sum(((x-mu_de)**2)/torch.exp(logvar_de)+logvar_de)
+    loss = kl_div + reconst_loss
     
     return loss

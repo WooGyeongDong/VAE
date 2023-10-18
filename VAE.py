@@ -1,24 +1,21 @@
 #%%
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim 
 from torch.utils.data import DataLoader
 
-import matplotlib.pyplot as plt
-import numpy as np
 from tqdm import tqdm
 import copy
 import wandb
 import importlib
 from data import load_MNIST
-from model_class import *
+import model_class as mod
+importlib.reload(mod)
 #%%
 config = {'input_dim' : 28*28,
-          'hidden_dim' : 500,
-          'latent_dim' : 10,
+          'hidden_dim' : 100,
+          'latent_dim' : 2,
           'batch_size' : 100,
-          'epochs' : 3,
+          'epochs' : 30,
           'lr' : 0.01,
           'best_loss' : 10**9,
           'patience_limit' : 3}
@@ -35,19 +32,8 @@ train_dataloader = DataLoader(train_data, batch_size = config['batch_size'], shu
 test_dataloader = DataLoader(test_data, batch_size = config['batch_size'])
 
 #%%
-model = VAE(x_dim=config['input_dim'], h_dim = config['hidden_dim'], z_dim = config['latent_dim']).to(device)
+model = mod.VAE(x_dim=config['input_dim'], h_dim = config['hidden_dim'], z_dim = config['latent_dim']).to(device)
 optimizer = torch.optim.Adagrad(model.parameters(), lr = config['lr'])
-
-model_n = VAE_norm(x_dim=config['input_dim'], h_dim = config['hidden_dim'], z_dim = config['latent_dim']).to(device)
-optimizer_n = torch.optim.Adagrad(model_n.parameters(), lr = config['lr'])
-
-#%%
-def loss_func(x, x_reconst, mu, logvar):
-    kl_div = 0.5 * torch.sum(mu**2 + logvar.exp() - logvar - 1)
-    reconst_loss = F.binary_cross_entropy(x_reconst, x, reduction='sum')
-    loss = kl_div + reconst_loss
-    
-    return loss
 
 #%% 
 img_size = config['input_dim']  
@@ -65,7 +51,7 @@ for epoch in tqdm(range(config['epochs'])):
         x_reconst, mu, logvar = model(x)
 
         # backprop and optimize
-        loss = loss_func(x, x_reconst, mu, logvar)
+        loss = mod.loss_func(x, x_reconst, mu, logvar)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -80,7 +66,7 @@ for epoch in tqdm(range(config['epochs'])):
             x_val = x_val.to(device)
             x_val_reconst, mu, logvar = model(x_val)
 
-            loss = loss_func(x_val, x_val_reconst, mu, logvar).item()
+            loss = mod.loss_func(x_val, x_val_reconst, mu, logvar).item()
             val_loss += loss/len(test_dataloader.dataset)
         val.append(val_loss)
         wandb.log({'train_loss':train_loss/len(train_dataloader.dataset), 'valid_loss': val_loss})
@@ -96,93 +82,32 @@ for epoch in tqdm(range(config['epochs'])):
             best_loss = val_loss
             best_model = copy.deepcopy(model)
             patience_check = 0
-    
-
-# %%
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-def reparameterization(mu, logvar):
-    std = torch.exp(logvar/2)
-    eps = torch.randn_like(std, dtype=torch.float32)
-    return mu + eps * std
 
 #%%
-class Encoder(nn.Module):
-    def __init__(self, x_dim, h_dim, z_dim):
-        super().__init__()
+import torchvision.utils
 
-        # 1st hidden layer
-        self.fc1 = nn.Sequential(
-            nn.Linear(x_dim, h_dim),
-            nn.Tanh()
-        )
-        nn.init.normal_(self.fc1[0].weight, mean=0, std= 0.1)
+image = [test_data[i][0] for i in range(9)]
+grid_img = torchvision.utils.make_grid(image, nrow=3)
 
-        # output layer
-        self.mu = nn.Linear(h_dim, z_dim)
-        self.logvar = nn.Linear(h_dim, z_dim)
-        nn.init.normal_(self.mu.weight, mean=0, std= 0.1)
-        nn.init.normal_(self.logvar.weight, mean=0, std= 0.1)
+generate_image = [model(image[i].view(-1, img_size).to(device))[0].reshape(-1,28,28) for i in range(9)]
+gen_grid_img = torchvision.utils.make_grid(generate_image, nrow=3)
 
-    def forward(self, x):
-        x = self.fc1(x)
+grid = []
+for i in range(20):
+    for j in range(20):
+        grid.append(((i/3-3),(j/3-3)))
+latent_image = [model.decoder(torch.tensor(i)).reshape(-1,28,28) for i in grid]
+latent_grid_img = torchvision.utils.make_grid(latent_image, nrow=20)
 
-        mu = self.mu(x)
-        logvar = self.logvar(x)
 
-        z = reparameterization(mu, logvar)
-        return z, mu, logvar
-    
+wandb.log({"original": wandb.Image(grid_img),
+           "generate": wandb.Image(gen_grid_img),
+           "latent generate": wandb.Image(latent_grid_img)})
+
+
 #%%
-    
-class Decoder_norm(nn.Module):
-    def __init__(self, x_dim, h_dim, z_dim):
-        super().__init__()
-
-        # 1st hidden layer
-        self.fc1 = nn.Sequential(
-            nn.Linear(z_dim, h_dim),
-            nn.Tanh(),
-        )
-        nn.init.normal_(self.fc1[0].weight, mean=0, std= 0.1)
-
-        # output layer
-        self.mu = nn.Linear(h_dim, x_dim)
-        self.logvar = nn.Linear(h_dim, x_dim)
-        nn.init.normal_(self.mu.weight, mean=0, std= 0.1)
-        nn.init.normal_(self.logvar.weight, mean=0, std= 0.1)
-
-    def forward(self, z):
-        z = self.fc1(z)
-        
-        mu_de = self.mu(z)
-        logvar_de = self.logvar(z)
-        
-        x_reconst = reparameterization(mu_de, logvar_de)
-        return x_reconst, mu_de, logvar_de
-    
-class VAE_norm(nn.Module):
-    def __init__(self, x_dim, h_dim, z_dim):
-        super().__init__()
-        self.encoder = Encoder(x_dim, h_dim, z_dim)
-        self.decoder = Decoder_norm(x_dim, h_dim, z_dim)
-        
-    def forward(self, x):
-        z, mu, logvar = self.encoder(x)
-        x_reconst, mu_de, logvar_de = self.decoder(z)
-        return x_reconst, mu_de, logvar_de, mu, logvar
-    
-def loss_norm(x, mu_de, logvar_de , mu, logvar):
-    kl_div = 0.5 * torch.sum(mu**2 + logvar.exp() - logvar - 1)
-    reconst_loss = 0.5*torch.sum(((x-mu_de)**2)/torch.exp(logvar_de)+logvar_de)
-    loss = kl_div + reconst_loss
-    
-    return loss
-
-model_n = VAE_norm(x_dim=config['input_dim'], h_dim = config['hidden_dim'], z_dim = config['latent_dim']).to(device)
-optimizer_n = torch.optim.Adagrad(model_n.parameters(), lr = 0.01)
+model_n = mod.VAE_norm(x_dim=config['input_dim'], h_dim = config['hidden_dim'], z_dim = config['latent_dim']).to(device)
+optimizer_n = torch.optim.Adagrad(model_n.parameters(), lr = config['lr'])
 
 #%%
 
@@ -201,7 +126,7 @@ for epoch in tqdm(range(config['epochs'])):
         x_reconst, mu_de, logvar_de, mu, logvar = model_n(x)
 
         # backprop and optimize
-        loss = loss_norm(x, mu_de, logvar_de, mu, logvar)
+        loss = mod.loss_norm(x, mu_de, logvar_de, mu, logvar)
         optimizer_n.zero_grad()
         loss.backward()
         optimizer_n.step()
@@ -216,10 +141,10 @@ for epoch in tqdm(range(config['epochs'])):
             x_val = x_val.to(device)
             x_val_reconst, mu_de, logvar_de, mu, logvar = model_n(x_val)
 
-            loss = loss_norm(x, mu_de, logvar_de, mu, logvar).item()
+            loss = mod.loss_norm(x, mu_de, logvar_de, mu, logvar).item()
             val_loss += loss/len(test_dataloader.dataset)
         val.append(val_loss)
-
+        wandb.log({'train_loss':train_loss/len(train_dataloader.dataset), 'valid_loss': val_loss})
         print(epoch, val_loss)
         if abs(val_loss - best_loss) < 1e-3: # loss가 개선되지 않은 경우
             patience_check += 1
@@ -233,26 +158,24 @@ for epoch in tqdm(range(config['epochs'])):
             best_model = copy.deepcopy(model_n)
             patience_check = 0
 
-
-
-#%%
-plt.plot(val)
-
-
-image, label = test_data[3]
-plt.imshow(image.squeeze().numpy())
-plt.title('label : %s' % label)
-plt.show()
-
-x = image.view(-1, img_size)
-x = x.to(device)
-x_reconst,_,_, _, _= model_n(x)
-
-# x = model.decoder(torch.tensor((0.5,0.1)))
-plt.imshow(x_reconst.reshape(28,28).detach().numpy())
-plt.title('label : %s' % label)
-plt.show()
-
 #%%
 
-torch.eye(2)
+image = [test_data[i][0] for i in range(9)]
+grid_img = torchvision.utils.make_grid(image, nrow=3)
+
+generate_image = [model_n(image[i].view(-1, img_size).to(device))[0].reshape(-1,28,28) for i in range(9)]
+gen_grid_img = torchvision.utils.make_grid(generate_image, nrow=3)
+
+grid = []
+for i in range(20):
+    for j in range(20):
+        grid.append(((i/3-3),(j/3-3)))
+latent_image = [model_n.decoder(torch.tensor(i))[0].reshape(-1,28,28) for i in grid]
+latent_grid_img = torchvision.utils.make_grid(latent_image, nrow=20)
+
+wandb.log({"original": wandb.Image(grid_img),
+           "generate": wandb.Image(gen_grid_img),
+           "latent generate": wandb.Image(latent_grid_img)})
+
+#%%
+
