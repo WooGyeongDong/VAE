@@ -7,10 +7,10 @@ from tqdm import tqdm
 import copy
 import wandb
 import importlib
-from data import load_MNIST
+from data import *
 import model_class as mod
 importlib.reload(mod)
-from scipy import io
+
 import matplotlib.pyplot as plt
 import torchvision.utils
 #%%
@@ -29,11 +29,7 @@ device = torch.device('cuda' if is_cuda else 'cpu')
 print('Current cuda device is', device)
 
 #%%
-file = io.loadmat("frey_rawface.mat" )
-file = file["ff"].T.reshape(-1,28,20)
-file[0]
-data = torch.from_numpy(file).float()/255
-
+data = load_frey_face()
 
 from sklearn.model_selection import train_test_split
 train_data, test_data =  train_test_split(data, test_size=0.25, random_state= 8)
