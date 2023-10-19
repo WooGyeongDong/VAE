@@ -4,3 +4,6 @@ data_utils.py
 main.py
 model.py
 wandb/
+frey_rawface.mat
+paper/
+mnist_all.mat

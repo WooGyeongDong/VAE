@@ -94,7 +94,7 @@ class Decoder_norm(nn.Module):
     def forward(self, z):
         z = self.fc1(z)
         
-        mu_de = self.mu(z)
+        mu_de = torch.sigmoid(self.mu(z))
         logvar_de = self.logvar(z)
         
         x_reconst = reparameterization(mu_de, logvar_de)
