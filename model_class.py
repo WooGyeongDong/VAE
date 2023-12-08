@@ -81,7 +81,7 @@ class Decoder_norm(nn.Module):
         # 1st hidden layer
         self.fc1 = nn.Sequential(
             nn.Linear(z_dim, h_dim),
-            nn.Tanh(),
+            nn.Tanh()
         )
         nn.init.normal_(self.fc1[0].weight, mean=0, std= 0.1)
 
@@ -117,3 +117,37 @@ def loss_norm(x, mu_de, logvar_de , mu, logvar):
     loss = kl_div + reconst_loss
     
     return loss
+
+class Prior(nn.Module):
+    def __init__(self, x_dim, h_dim, z_dim):
+        super().__init__()
+        self.z_dim = z_dim
+        self.decoder = Decoder(x_dim, h_dim, z_dim)
+
+
+    def forward(self, x):
+        z = torch.randn(len(x),self.z_dim)
+        x_reconst = self.decoder(z)
+        return x_reconst
+
+
+class AE(nn.Module):
+    def __init__(self, x_dim, h_dim, z_dim):
+        super().__init__()
+        self.encoder = nn.Sequential(
+            nn.Linear(x_dim, h_dim),
+            nn.Tanh(),
+            nn.Linear(h_dim, z_dim),
+        )
+
+        self.decoder = nn.Sequential(
+            nn.Linear(z_dim, h_dim),
+            nn.Tanh(),
+            nn.Linear(h_dim, x_dim),
+        )
+
+    def forward(self, x):
+        z = self.encoder(x)
+        x_reconst = torch.sigmoid(self.decoder(z))
+
+        return x_reconst
