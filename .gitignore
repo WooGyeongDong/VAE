@@ -7,3 +7,7 @@ wandb/
 frey_rawface.mat
 paper/
 mnist_all.mat
+VAE_face_sever.py
+output.png
+whyposterior.py
+model_scripted.pt
